@@ -8,6 +8,8 @@ pub trait Eval {
 }
 pub trait Diff: Copy {
     type Result;
-    fn diff(&self) -> Result<Self::Result, Error>;
+    fn diff(&self) -> Result<Self::Result, Error> {
+        Err(Error)
+    }
 }
 
