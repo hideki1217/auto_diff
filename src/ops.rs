@@ -1,14 +1,13 @@
-use num::{Zero, One};
-use crate::digest::{Diff, Eval, T, Error};
-
-
+use crate::digest::{Diff, Error, Eval, T};
+use num::{One, Zero};
+use std::fmt;
 
 #[derive(Clone, Copy, Debug)]
 struct Const(T);
 impl Diff for Const {
     type Result = Const;
 
-    fn diff(&self) ->Result<Self::Result,Error> {
+    fn diff(&self) -> Result<Self::Result, Error> {
         Ok(Const(T::zero()))
     }
 }
@@ -17,13 +16,18 @@ impl Eval for Const {
         self.0
     }
 }
+impl fmt::Display for Const {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Var;
 impl Diff for Var {
     type Result = Const;
 
-    fn diff(&self) -> Result<Self::Result,Error> {
+    fn diff(&self) -> Result<Self::Result, Error> {
         Ok(Const(T::one()))
     }
 }
@@ -32,13 +36,18 @@ impl Eval for Var {
         x
     }
 }
+impl fmt::Display for Var {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "x")
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Add<Lhs, Rhs>(Lhs, Rhs);
 impl<Lhs: Diff, Rhs: Diff> Diff for Add<Lhs, Rhs> {
     type Result = Add<Lhs::Result, Rhs::Result>;
 
-    fn diff(&self) -> Result<Self::Result,Error> {
+    fn diff(&self) -> Result<Self::Result, Error> {
         Ok(Add(self.0.diff()?, self.1.diff()?))
     }
 }
@@ -51,13 +60,22 @@ where
         self.0.eval(x) + self.1.eval(x)
     }
 }
+impl<Lhs, Rhs> fmt::Display for Add<Rhs, Lhs>
+where
+    Lhs: fmt::Display,
+    Rhs: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}) + ({})", self.0, self.1)
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Sub<Lhs, Rhs>(Lhs, Rhs);
 impl<Lhs: Diff, Rhs: Diff> Diff for Sub<Lhs, Rhs> {
     type Result = Sub<Lhs::Result, Rhs::Result>;
 
-    fn diff(&self) -> Result<Self::Result,Error> {
+    fn diff(&self) -> Result<Self::Result, Error> {
         Ok(Sub(self.0.diff()?, self.1.diff()?))
     }
 }
@@ -70,14 +88,26 @@ where
         self.0.eval(x) - self.1.eval(x)
     }
 }
+impl<Lhs, Rhs> fmt::Display for Sub<Rhs, Lhs>
+where
+    Lhs: fmt::Display,
+    Rhs: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}) - ({})", self.0, self.1)
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Mul<Lhs, Rhs>(Lhs, Rhs);
 impl<Lhs: Diff, Rhs: Diff> Diff for Mul<Lhs, Rhs> {
     type Result = Add<Mul<Lhs::Result, Rhs>, Mul<Lhs, Rhs::Result>>;
 
-    fn diff(&self) -> Result<Self::Result,Error> {
-        Ok(Add(Mul(self.0.diff()?, self.1), Mul(self.0, self.1.diff()?)))
+    fn diff(&self) -> Result<Self::Result, Error> {
+        Ok(Add(
+            Mul(self.0.diff()?, self.1),
+            Mul(self.0, self.1.diff()?),
+        ))
     }
 }
 impl<Lhs, Rhs> Eval for Mul<Rhs, Lhs>
@@ -89,13 +119,22 @@ where
         self.0.eval(x) * self.1.eval(x)
     }
 }
+impl<Lhs, Rhs> fmt::Display for Mul<Rhs, Lhs>
+where
+    Lhs: fmt::Display,
+    Rhs: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}) * ({})", self.0, self.1)
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Neg<X>(X);
 impl<X: Diff> Diff for Neg<X> {
     type Result = Neg<X::Result>;
 
-    fn diff(&self) -> Result<Self::Result,Error> {
+    fn diff(&self) -> Result<Self::Result, Error> {
         Ok(Neg(self.0.diff()?))
     }
 }
@@ -104,20 +143,39 @@ impl<X: Eval> Eval for Neg<X> {
         -self.0.eval(x)
     }
 }
+impl<X> fmt::Display for Neg<X>
+where
+    X: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "-({})", self.0)
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Pow<X>(X, T);
 impl<X: Diff> Diff for Pow<X> {
     type Result = Mul<Const, Mul<Pow<X>, X::Result>>;
 
-    fn diff(&self) -> Result<Self::Result,Error> {
+    fn diff(&self) -> Result<Self::Result, Error> {
         assert_ne!(self.1, 0.0);
-        Ok(Mul(Const(self.1), Mul(Pow(self.0, self.1 - 1.0), self.0.diff()?)))
+        Ok(Mul(
+            Const(self.1),
+            Mul(Pow(self.0, self.1 - 1.0), self.0.diff()?),
+        ))
     }
 }
 impl<X: Eval> Eval for Pow<X> {
     fn eval(&self, x: T) -> T {
         self.0.eval(x).powf(self.1)
+    }
+}
+impl<X> fmt::Display for Pow<X>
+where
+    X: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({})^{}", self.0, self.1)
     }
 }
 
@@ -126,7 +184,7 @@ struct Exp<X>(X);
 impl<X: Diff> Diff for Exp<X> {
     type Result = Mul<Exp<X>, X::Result>;
 
-    fn diff(&self) -> Result<Self::Result,Error> {
+    fn diff(&self) -> Result<Self::Result, Error> {
         Ok(Mul(Exp(self.0), self.0.diff()?))
     }
 }
@@ -135,19 +193,35 @@ impl<X: Eval> Eval for Exp<X> {
         self.0.eval(x).exp()
     }
 }
+impl<X> fmt::Display for Exp<X>
+where
+    X: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "exp({})", self.0)
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Log<X>(X);
 impl<X: Diff> Diff for Log<X> {
     type Result = Mul<Pow<X>, X::Result>;
 
-    fn diff(&self) -> Result<Self::Result,Error> {
-        Ok(Mul(Pow(self.0,-1.0), self.0.diff()?))
+    fn diff(&self) -> Result<Self::Result, Error> {
+        Ok(Mul(Pow(self.0, -1.0), self.0.diff()?))
     }
 }
 impl<X: Eval> Eval for Log<X> {
     fn eval(&self, x: T) -> T {
         self.0.eval(x).ln()
+    }
+}
+impl<X> fmt::Display for Log<X>
+where
+    X: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "log({})", self.0)
     }
 }
 
@@ -156,7 +230,7 @@ struct Sin<X>(X);
 impl<X: Diff> Diff for Sin<X> {
     type Result = Mul<Cos<X>, X::Result>;
 
-    fn diff(&self) -> Result<Self::Result,Error> {
+    fn diff(&self) -> Result<Self::Result, Error> {
         Ok(Mul(Cos(self.0), self.0.diff()?))
     }
 }
@@ -165,13 +239,21 @@ impl<X: Eval> Eval for Sin<X> {
         self.0.eval(x).sin()
     }
 }
+impl<X> fmt::Display for Sin<X>
+where
+    X: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "sin({})", self.0)
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 struct Cos<X>(X);
 impl<X: Diff> Diff for Cos<X> {
     type Result = Mul<Neg<Sin<X>>, X::Result>;
 
-    fn diff(&self) -> Result<Self::Result,Error> {
+    fn diff(&self) -> Result<Self::Result, Error> {
         Ok(Mul(Neg(Sin(self.0)), self.0.diff()?))
     }
 }
@@ -180,7 +262,14 @@ impl<X: Eval> Eval for Cos<X> {
         self.0.eval(x).cos()
     }
 }
-
+impl<X> fmt::Display for Cos<X>
+where
+    X: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "cos({})", self.0)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -228,7 +317,7 @@ mod tests {
         assert_eq!(x.eval(2.0), 2.0_f64.powi(6).exp());
 
         let dx = x.diff().unwrap(); // 10x^4exp(2x^5)
+        println!("{}", dx);
         assert_eq!(dx.eval(2.0), 10.0 * 2.0_f64.powi(4) * 2.0_f64.powi(6).exp())
-        
     }
 }
