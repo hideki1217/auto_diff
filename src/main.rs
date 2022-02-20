@@ -1,6 +1,4 @@
-use core::fmt;
-
-use auto_diff::digest::{Diff, Eval, T};
+use auto_diff::digest::{Diff, Eval, T, Const, Var};
 use auto_diff::ops::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -16,6 +14,11 @@ impl<X:Eval> Eval for Relu<X> {
         let x = self.0.eval(x);
         if x >= 0.0 { x } else { 0.0 }
     }
+
+    fn const_eval(&self) -> Result<Const,()> {
+        let x = self.0.const_eval()?.0;
+        Ok(Const(if x >= 0.0 { x } else { 0.0 }))
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -27,6 +30,11 @@ impl<X:Eval> Eval for Step<X> {
     fn eval(&self, x: T) -> T {
         let x = self.0.eval(x);
         if x >= 0.0 { 1.0 } else { 0.0 }
+    }
+
+    fn const_eval(&self) -> Result<Const,()> {
+        let x = self.0.const_eval()?.0;
+        Ok(Const(if x >= 0.0 { 1.0 } else { 0.0 }))
     }
 }
 

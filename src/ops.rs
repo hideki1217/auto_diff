@@ -1,46 +1,9 @@
-use crate::digest::{Diff, Error, Eval, T};
-use num::{One, Zero};
+use num::Zero;
+
+use crate::digest::*;
 use std::fmt;
 
-#[derive(Clone, Copy, Debug)]
-pub struct Const(pub T);
-impl Diff for Const {
-    type Result = Const;
 
-    fn diff(&self) -> Result<Self::Result, Error> {
-        Ok(Const(T::zero()))
-    }
-}
-impl Eval for Const {
-    fn eval(&self, _: T) -> T {
-        self.0
-    }
-}
-impl fmt::Display for Const {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct Var;
-impl Diff for Var {
-    type Result = Const;
-
-    fn diff(&self) -> Result<Self::Result, Error> {
-        Ok(Const(T::one()))
-    }
-}
-impl Eval for Var {
-    fn eval(&self, x: T) -> T {
-        x
-    }
-}
-impl fmt::Display for Var {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "x")
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Add<Lhs, Rhs>(pub Lhs, pub Rhs);
@@ -58,6 +21,10 @@ where
 {
     fn eval(&self, x: T) -> T {
         self.0.eval(x) + self.1.eval(x)
+    }
+
+    fn const_eval(&self) -> Result<Const,()> {
+        Ok(Const(self.0.const_eval()?.0 + self.1.const_eval()?.0))
     }
 }
 impl<Lhs, Rhs> fmt::Display for Add<Rhs, Lhs>
@@ -86,6 +53,10 @@ where
 {
     fn eval(&self, x: T) -> T {
         self.0.eval(x) - self.1.eval(x)
+    }
+
+    fn const_eval(&self) -> Result<Const,()> {
+        Ok(Const(self.0.const_eval()?.0 - self.1.const_eval()?.0))
     }
 }
 impl<Lhs, Rhs> fmt::Display for Sub<Rhs, Lhs>
@@ -118,6 +89,17 @@ where
     fn eval(&self, x: T) -> T {
         self.0.eval(x) * self.1.eval(x)
     }
+
+    fn const_eval(&self) -> Result<Const,()> {
+        let lhs = self.0.const_eval();
+        let rhs = self.1.const_eval();
+        match (lhs,rhs) {
+            (Ok(Const(l)),_) if l.is_zero() => Ok(Const(T::zero())),
+            (_,Ok(Const(r))) if r.is_zero() => Ok(Const(T::zero())),
+            (Ok(Const(l)), Ok(Const(r))) => Ok(Const(l*r)),
+            _ => Err(())
+        }
+    }
 }
 impl<Lhs, Rhs> fmt::Display for Mul<Rhs, Lhs>
 where
@@ -141,6 +123,10 @@ impl<X: Diff> Diff for Neg<X> {
 impl<X: Eval> Eval for Neg<X> {
     fn eval(&self, x: T) -> T {
         -self.0.eval(x)
+    }
+
+    fn const_eval(&self) -> Result<Const,()> {
+        Ok(Const(-self.0.const_eval()?.0))
     }
 }
 impl<X> fmt::Display for Neg<X>
@@ -169,6 +155,10 @@ impl<X: Eval> Eval for Pow<X> {
     fn eval(&self, x: T) -> T {
         self.0.eval(x).powf(self.1)
     }
+
+    fn const_eval(&self) -> Result<Const,()> {
+        Ok(Const(self.0.const_eval()?.0.powf(self.1)))
+    }
 }
 impl<X> fmt::Display for Pow<X>
 where
@@ -191,6 +181,10 @@ impl<X: Diff> Diff for Exp<X> {
 impl<X: Eval> Eval for Exp<X> {
     fn eval(&self, x: T) -> T {
         self.0.eval(x).exp()
+    }
+
+    fn const_eval(&self) -> Result<Const,()> {
+        Ok(Const(self.0.const_eval()?.0.exp()))
     }
 }
 impl<X> fmt::Display for Exp<X>
@@ -215,6 +209,10 @@ impl<X: Eval> Eval for Log<X> {
     fn eval(&self, x: T) -> T {
         self.0.eval(x).ln()
     }
+
+    fn const_eval(&self) -> Result<Const,()> {
+        Ok(Const(self.0.const_eval()?.0.ln()))
+    }
 }
 impl<X> fmt::Display for Log<X>
 where
@@ -238,6 +236,10 @@ impl<X: Eval> Eval for Sin<X> {
     fn eval(&self, x: T) -> T {
         self.0.eval(x).sin()
     }
+
+    fn const_eval(&self) -> Result<Const,()> {
+        Ok(Const(self.0.const_eval()?.0.sin()))
+    }
 }
 impl<X> fmt::Display for Sin<X>
 where
@@ -260,6 +262,10 @@ impl<X: Diff> Diff for Cos<X> {
 impl<X: Eval> Eval for Cos<X> {
     fn eval(&self, x: T) -> T {
         self.0.eval(x).cos()
+    }
+
+    fn const_eval(&self) -> Result<Const,()> {
+        Ok(Const(self.0.const_eval()?.0.cos()))
     }
 }
 impl<X> fmt::Display for Cos<X>
@@ -319,5 +325,17 @@ mod tests {
         let dx = x.diff().unwrap(); // 10x^4exp(2x^5)
         println!("{}", dx);
         assert_eq!(dx.eval(2.0), 10.0 * 2.0_f64.powi(4) * 2.0_f64.powi(6).exp())
+    }
+
+    #[test]
+    fn const_eval_test() {
+        let y = Mul(Const(0.0), Exp(Var));
+        assert_eq!(y.const_eval().unwrap().0, 0.0);
+
+        let y = Add(Mul(Const(1.0), Const(2.0)), Exp(Log(Const(2.0))));
+        assert_eq!(y.const_eval().unwrap().0, 4.0);
+
+        let y = Add(Mul(Const(1.0), Const(2.0)), Exp(Log(Var)));
+        assert!(y.const_eval().is_err());
     }
 }
