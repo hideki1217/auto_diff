@@ -3,7 +3,7 @@ use num::{One, Zero};
 use std::fmt;
 
 #[derive(Clone, Copy, Debug)]
-struct Const(T);
+pub struct Const(pub T);
 impl Diff for Const {
     type Result = Const;
 
@@ -23,7 +23,7 @@ impl fmt::Display for Const {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Var;
+pub struct Var;
 impl Diff for Var {
     type Result = Const;
 
@@ -43,7 +43,7 @@ impl fmt::Display for Var {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Add<Lhs, Rhs>(Lhs, Rhs);
+pub struct Add<Lhs, Rhs>(pub Lhs, pub Rhs);
 impl<Lhs: Diff, Rhs: Diff> Diff for Add<Lhs, Rhs> {
     type Result = Add<Lhs::Result, Rhs::Result>;
 
@@ -71,7 +71,7 @@ where
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Sub<Lhs, Rhs>(Lhs, Rhs);
+pub struct Sub<Lhs, Rhs>(pub Lhs, pub Rhs);
 impl<Lhs: Diff, Rhs: Diff> Diff for Sub<Lhs, Rhs> {
     type Result = Sub<Lhs::Result, Rhs::Result>;
 
@@ -99,7 +99,7 @@ where
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Mul<Lhs, Rhs>(Lhs, Rhs);
+pub struct Mul<Lhs, Rhs>(pub Lhs, pub Rhs);
 impl<Lhs: Diff, Rhs: Diff> Diff for Mul<Lhs, Rhs> {
     type Result = Add<Mul<Lhs::Result, Rhs>, Mul<Lhs, Rhs::Result>>;
 
@@ -130,7 +130,7 @@ where
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Neg<X>(X);
+pub struct Neg<X>(pub X);
 impl<X: Diff> Diff for Neg<X> {
     type Result = Neg<X::Result>;
 
@@ -153,7 +153,7 @@ where
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Pow<X>(X, T);
+pub struct Pow<X>(X, T);
 impl<X: Diff> Diff for Pow<X> {
     type Result = Mul<Const, Mul<Pow<X>, X::Result>>;
 
@@ -180,7 +180,7 @@ where
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Exp<X>(X);
+pub struct Exp<X>(pub X);
 impl<X: Diff> Diff for Exp<X> {
     type Result = Mul<Exp<X>, X::Result>;
 
@@ -203,7 +203,7 @@ where
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Log<X>(X);
+pub struct Log<X>(pub X);
 impl<X: Diff> Diff for Log<X> {
     type Result = Mul<Pow<X>, X::Result>;
 
@@ -226,7 +226,7 @@ where
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Sin<X>(X);
+pub struct Sin<X>(pub X);
 impl<X: Diff> Diff for Sin<X> {
     type Result = Mul<Cos<X>, X::Result>;
 
@@ -249,7 +249,7 @@ where
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Cos<X>(X);
+pub struct Cos<X>(pub X);
 impl<X: Diff> Diff for Cos<X> {
     type Result = Mul<Neg<Sin<X>>, X::Result>;
 
