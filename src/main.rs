@@ -1,43 +1,10 @@
-use auto_diff::digest::{Diff, Eval, T, Const, Var};
+use auto_diff::digest::{Diff, Eval, Const, Var};
 use auto_diff::ops::*;
+use auto_diff::wrap_for_diff_and_eval;
 
-#[derive(Clone, Copy, Debug)]
-struct Relu<X>(X);
-impl<X: Diff> Diff for Relu<X> {
-    type Result = Mul<Step<X>,X::Result>;
-    fn diff(&self) -> Result<Self::Result, auto_diff::digest::Error> {
-        Ok(Mul(Step(self.0), self.0.diff()?))
-    }
-}
-impl<X:Eval> Eval for Relu<X> {
-    fn eval(&self, x: T) -> T {
-        let x = self.0.eval(x);
-        if x >= 0.0 { x } else { 0.0 }
-    }
 
-    fn const_eval(&self) -> Result<Const,()> {
-        let x = self.0.const_eval()?.0;
-        Ok(Const(if x >= 0.0 { x } else { 0.0 }))
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Step<X>(X);
-impl<X: Diff> Diff for Step<X>{
-    type Result = ();
-}
-impl<X:Eval> Eval for Step<X> {
-    fn eval(&self, x: T) -> T {
-        let x = self.0.eval(x);
-        if x >= 0.0 { 1.0 } else { 0.0 }
-    }
-
-    fn const_eval(&self) -> Result<Const,()> {
-        let x = self.0.const_eval()?.0;
-        Ok(Const(if x >= 0.0 { 1.0 } else { 0.0 }))
-    }
-}
-
+wrap_for_diff_and_eval!(Relu, Step, |x| if x >= 0.0 { x } else { 0.0 } );
+wrap_for_diff_and_eval!(Step, |x| if x >= 0.0 { 1.0 } else { 0.0 });
 
 fn main() {
     let sigmoid = Mul(Exp(Var), Add(Const(1.0), Exp(Var)));
