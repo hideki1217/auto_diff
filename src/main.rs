@@ -7,7 +7,8 @@ wrap_for_diff_and_eval!(Relu, Step, |x| if x >= 0.0 { x } else { 0.0 } );
 wrap_for_diff_and_eval!(Step, |x| if x >= 0.0 { 1.0 } else { 0.0 });
 
 fn main() {
-    let sigmoid = Mul(Exp(Var), Add(Const(1.0), Exp(Var)));
+    let sigmoid = Mul(Exp(Var), Pow(Add(Const(1.0), Exp(Var)), -1.0));
+    println!("{}", sigmoid);
     let sigmoid_diff = sigmoid.diff().unwrap();
     println!("{}", sigmoid_diff);
 
